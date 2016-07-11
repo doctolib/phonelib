@@ -21,7 +21,7 @@ module Phonelib
     #
     def initialize(original, country = nil)
       @original, @extension = separate_extension(original)
-      @extension.gsub!(/[^0-9]/, '') if @extension
+      @extension.tr!('^0-9', '') if @extension
 
       if sanitized.empty?
         @data = {}
@@ -34,11 +34,11 @@ module Phonelib
 
     # method to get sanitized phone number (only numbers)
     def sanitized
-      @sanitized = if Phonelib.strict_check
-                     @original
-                   else
-                     @original && @original.gsub(/[^0-9]+/, '') || ''
-                   end
+      @sanitized ||= if Phonelib.strict_check
+                       @original
+                     else
+                       @original && @original.tr('^0-9', '') || ''
+                     end
     end
 
     # Returns all phone types that matched valid patterns
@@ -141,13 +141,16 @@ module Phonelib
     # Returns formatted national number
     def national(formatted = true)
       return @national_number unless valid?
-      format_match, format_string = get_formatting_data
+      if formatted
+        format_match, format_string = get_formatting_data
 
-      if format_match
-        out = format_string.gsub(/\$\d/) { |el| format_match[el[1].to_i] }
-        formatted ? out : out.gsub(/[^0-9]/, '')
+        if format_match
+          format_string.gsub(/\$\d/) { |el| format_match[el[1].to_i] }
+        else
+          @national_number
+        end
       else
-        @national_number
+        unformatted_data
       end
     end
 
@@ -243,6 +246,13 @@ module Phonelib
       countries_array.find do |iso2|
         @data[iso2][Core::MAIN_COUNTRY_FOR_CODE] == 'true'
       end || countries_array.first
+    end
+
+    # Get national phone number without formatting
+    def unformatted_data
+      prefix = @data[country][Core::NATIONAL_PREFIX]
+
+      "#{prefix}#{@national_number}"
     end
 
     # Get needable data for formatting phone as national number
